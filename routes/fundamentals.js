@@ -7,9 +7,7 @@ const {
   normalizeItemSymbolExchange,
   cleanSym,
 } = require("../lib/symbols");
-const {
-  resolveBseNumericToYahooSymbol, // existing helper (fast path)
-} = require("../lib/yahoo");
+const { resolveBseNumericToYahooSymbol } = require("../lib/yahoo");
 
 const router = Router();
 
@@ -17,23 +15,18 @@ async function normalizeForGoogle(item) {
   const { symbol, exchange } = normalizeItemSymbolExchange(item);
 
   if (exchange === "BSE") {
-    // If numeric, resolve to Security ID quickly using your Yahoo helper,
-    // but don't fail the whole request if it can't be resolved now.
     if (isNumericSymbol(symbol)) {
       try {
         const yahooSym = await resolveBseNumericToYahooSymbol(symbol);
         const secId = yahooSym.replace(/\.BO$/i, "");
         return { symbol: cleanSym(secId), exchange: "BOM" };
       } catch {
-        // fallback: still try Google with numeric code tagged as BOM
         return { symbol: cleanSym(symbol), exchange: "BOM" };
       }
     }
-    // textual BSE ticker → Google wants BOM
     return { symbol: cleanSym(symbol), exchange: "BOM" };
   }
 
-  // NSE stays NSE
   return { symbol: cleanSym(symbol), exchange: "NSE" };
 }
 

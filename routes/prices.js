@@ -1,7 +1,6 @@
-// routes/prices.js
 const { Router } = require("express");
 const YahooFinance = require("yahoo-finance2").default;
-const Bottleneck = require("Bottleneck".toLowerCase()); // safe on case-sensitive fs
+const Bottleneck = require("Bottleneck".toLowerCase()); 
 const { quotesCache } = require("../lib/cache");
 const {
   normalizeItemSymbolExchange,
@@ -12,7 +11,7 @@ const { fetchGoogleCmp } = require("../lib/google_price");
 
 const router = Router();
 const yahooFinance = new YahooFinance();
-const limiter = new Bottleneck({ minTime: 200 }); // ~5 req/s
+const limiter = new Bottleneck({ minTime: 200 }); 
 
 async function getQuoteWithRetry(sym, attempts = 3) {
   let lastErr;
@@ -31,18 +30,11 @@ async function getQuoteWithRetry(sym, attempts = 3) {
   throw lastErr;
 }
 
-/**
- * Decide source:
- *  - NSE → Yahoo <SYM>.NS
- *  - BSE textual (e.g., ICICIBANK) → Yahoo <SYM>.BO
- *  - BSE numeric (e.g., 544107) → Google <CODE>:BOM
- */
 function decideSource(item) {
   const { symbol, exchange } = normalizeItemSymbolExchange(item);
   if (exchange === "BSE" && isNumericSymbol(symbol)) {
-    return { source: "google", symbol, exchange }; // 544107:BOM
+    return { source: "google", symbol, exchange };
   }
-  // Yahoo for everything else
   return { source: "yahoo", symbol, exchange };
 }
 
@@ -50,18 +42,15 @@ router.post("/", async (req, res) => {
   try {
     const { symbols, items } = req.body || {};
 
-    // Normalize into "jobs" so we can mix sources
     let jobs = [];
 
     if (Array.isArray(items) && items.length) {
       jobs = items.map((i) => {
         const { symbol, exchange } = normalizeItemSymbolExchange(i);
         const pick = decideSource({ symbol, exchange });
-        // keep original fields to log/return if needed
         return { ...pick, raw: i };
       });
     } else if (Array.isArray(symbols) && symbols.length) {
-      // If only symbols[] provided, assume NSE unless numeric → BSE/Google.
       jobs = symbols.map((s) => {
         const exchange = isNumericSymbol(s) ? "BSE" : "NSE";
         const pick = decideSource({ symbol: s, exchange });
@@ -71,15 +60,13 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "Provide symbols[] or items[]" });
     }
 
-    // Split by source
     const googleJobs = jobs.filter((j) => j.source === "google");
     const yahooJobs = jobs.filter((j) => j.source === "yahoo");
 
-    // --- Google (BSE numerics) ---
     const googleResultsPromise = Promise.all(
       googleJobs.map(async (j) => {
         try {
-          const r = await fetchGoogleCmp(j.symbol, j.exchange); // exchange=BSE -> BOM internally
+          const r = await fetchGoogleCmp(j.symbol, j.exchange);
           if (r.ok) return r;
           return {
             ok: false,
@@ -105,11 +92,7 @@ router.post("/", async (req, res) => {
       })
     );
 
-    // --- Yahoo (NSE & BSE textual) ---
-    // Prepare Yahoo symbols
-    const yahooSymbols = yahooJobs.map(
-      (j) => toYahoo(j.symbol, j.exchange) // e.g., HDFCBANK.NS or ICICIBANK.BO
-    );
+    const yahooSymbols = yahooJobs.map((j) => toYahoo(j.symbol, j.exchange));
 
     let yahooResultsPromise = Promise.resolve([]);
     if (yahooSymbols.length) {
@@ -146,7 +129,6 @@ router.post("/", async (req, res) => {
             }
           })
         ).then((arr) => {
-          // Cache only the Yahoo part by its own key
           quotesCache.set(key, arr);
           return arr;
         });

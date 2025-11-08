@@ -18,7 +18,6 @@ router.post("/upload", upload.single("file"), async (req, res, next) => {
 
     const { rows, meta } = parseExcel(req.file.buffer);
 
-    // optional debug flag: /api/portfolio/upload?debug=1
     if (req.query.debug) {
       return res.json({ meta, rowsPreview: rows.slice(0, 5) });
     }
